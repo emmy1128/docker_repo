@@ -1,0 +1,35 @@
+node {
+    
+    def mvnHome = tool 'Maven3'
+    
+    stage ('Checkout') {    
+        checkout scm   
+    
+    }
+    
+    stage ('build')  {
+        sh "${mvnHome}/bin/mvn package -f MyJavaApp/pom.xml"
+    } 
+    
+    stage ('Docker Build') {
+     // Build and push image with Jenkins' docker-plugin
+    withDockerServer([uri: "tcp://localhost:4243"]) {
+        withDockerRegistry([credentialsId: "dockerhub", url: "https://index.docker.io/v1/"]) {
+        image = docker.build("user_id/myspringbootapp", "MyJavaApp")
+        image.push()    
+        }
+      }
+    }
+    
+    stage ('Kubernetes Deploy') {
+        kubernetesDeploy(
+            configs: 'MyJavaApp/springBootDeploy.yml',
+            kubeconfigId: 'K8S',
+            enableConfigSubstitution: true
+            )
+    }
+    /*
+        stage ('Kubernetes Deploy using Kubectl') {
+          sh "kubectl apply -f MyJavaApp/springBootDeploy.yml"
+    }*/
+}
